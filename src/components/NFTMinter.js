@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { ethers } from 'ethers';
 import axios from 'axios';
 import '../App.css';
+
 const CONTRACT_ADDRESS = '0xbE00c6F9A4941eBb4cE88cd81929F49bbaF0e26B';
 const NFT_STORAGE_API_KEY = '274f0a4a.b605deaf016548d7be867afb618399ae';
 
 const ABI = [
-  "function mintNFT(address to, string memory tokenURI) public returns (uint256)"
+  "function safeMint(address to, string memory uri) public"
 ];
 
 export default function NFTMinter() {
@@ -34,7 +35,7 @@ export default function NFTMinter() {
     });
 
     const imageCid = imageRes.data.value.cid;
-    const imageURI = `ipfs://${imageCid}`;
+    const imageURI = `https://ipfs.io/ipfs/${imageCid}`;
 
     const metadata = {
       name: "Zen NFT #1",
@@ -54,26 +55,33 @@ export default function NFTMinter() {
     );
 
     const metadataCid = metadataRes.data.value.cid;
-    return `ipfs://${metadataCid}`;
+    return `https://ipfs.io/ipfs/${metadataCid}`;
   };
 
   const mintNFT = async () => {
     try {
       const tokenURI = await uploadToNFTStorage();
-      setStatus('Menyambungkan wallet...');
-
+      await window.ethereum.request({ method: 'eth_requestAccounts' }); // Minta akses wallet
       const provider = new ethers.BrowserProvider(window.ethereum);
       const signer = await provider.getSigner();
+
+      const network = await provider.getNetwork();
+      if (network.chainId !== 4869) {
+        setStatus("Harap pindah ke jaringan ZenChain Testnet.");
+        setLoading(false);
+        return;
+      }
+
       const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
 
       setStatus('Sedang mint NFT...');
-      const tx = await contract.mintNFT(await signer.getAddress(), tokenURI);
+      const tx = await contract.safeMint(await signer.getAddress(), tokenURI);
       await tx.wait();
 
       setStatus('NFT berhasil dimint!');
     } catch (err) {
       console.error(err);
-      setStatus('Gagal mint NFT.');
+      setStatus('Gagal mint NFT. Cek console untuk detail.');
     } finally {
       setLoading(false);
     }
@@ -112,4 +120,4 @@ export default function NFTMinter() {
       )}
     </div>
   );
-}
+    }
